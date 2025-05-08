@@ -1,1 +1,1 @@
-# [TODO] Give the box of the tracked person and ask the depth (in meters?)
+# TODO: Give the box of the tracked person and ask the depth (in meters?)

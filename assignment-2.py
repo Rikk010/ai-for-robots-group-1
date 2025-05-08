@@ -21,7 +21,7 @@ def main():
         type=str,
         default="depth-anything/Depth-Anything-V2-Small-hf",
         help=(
-            "Hugging Face depth-estimation model ID. Available models:\n"
+            "Hugging Face depth-estimation model ID (will be locally installed in the cache). Available models:\n"
             "- depth-anything/Depth-Anything-V2-Small-hf    (Params: 24.8M)\n"
             "- depth-anything/Depth-Anything-V2-Medium-hf   (Params: 97.5M)\n"
             "- depth-anything/Depth-Anything-V2-Large-hf    (Params: 335.3M)\n"
@@ -71,6 +71,7 @@ def main():
             cv2.putText(depth_bgr, text, pos, cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,255), 1)
             cv2.imshow("Depth", depth_bgr)
 
+            # Exit on 'q' key press
             if cv2.waitKey(1) & 0xFF == ord("q"):
                 break
     finally:

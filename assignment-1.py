@@ -4,12 +4,11 @@ from utils import detection
 from ultralytics import YOLO
 import cv2
 
-CAMERA_ID= 1
-TARGET_CLASS = 0 # 0: Person 1:Helmet
-TARGET_ID = 1 # 1 is the first ID given
+CAMERA_ID       = 1
+TARGET_CLASS    = 0 # 0: Person | 1: Helmet
+TARGET_ID       = 1 # 1 is the first ID given
 
 model = YOLO("./models/helmet-medium.pt")
-
 
 cap = cv2.VideoCapture(CAMERA_ID)
 if not cap.isOpened():
@@ -21,7 +20,6 @@ while True:
     if not ret:
         print("Error: Could not read frame.")
         break
-
 
     tracks = tracking.track(model, frame)
 
@@ -36,13 +34,12 @@ while True:
             cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
             cv2.putText(frame, f"Other {class_names[cls_id]} id: {track_id}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
 
-
     relative_x = (x1 + x2) / 2 / frame.shape[1]
     relative_y = (y1 + y2) / 2 / frame.shape[0]
 
     if relative_x < 0.5:
         print("Object is on the left side of the frame, rotating....")
-        # TODO: rotate robot
+        # TODO: Rotate robot
     elif relative_x > 0.5:
         print("Object is on the right side of the frame, rotating....")
 
@@ -51,7 +48,3 @@ while True:
     # Exit on 'q' key press
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
-
-
-
-

@@ -1,4 +1,4 @@
-# AI For autonomous robots group 1
+# AI for Autonomous Robots - Group 1
 
 ## Installation
 ```terminal
