@@ -4,9 +4,9 @@ from utils import detection
 from ultralytics import YOLO
 import cv2
 
-CAMERA_ID       = 1
-TARGET_CLASS    = 0 # 0: Person | 1: Helmet
-TARGET_ID       = 1 # 1 is the first ID given
+CAMERA_ID       = 0     # 0 for the default camera | 1 for external
+TARGET_CLASS    = 0     # 0: Person | 1: Helmet
+TARGET_ID       = 1     # 1 is the first ID given
 
 model = YOLO("./models/helmet-medium.pt")
 
