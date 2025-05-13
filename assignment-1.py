@@ -24,7 +24,7 @@ while True:
     tracks = tracking.track(model, frame)
 
     class_names = ["Person", "Helmet"]
-    for track_id, cls_id, x1, y1, x2, y2 in tracks:
+    for track_id, cls_id, x1, y1, x2, y2, conf in tracks:
         if track_id == TARGET_ID and cls_id == TARGET_CLASS:
             # Draw a rectangle around the tracked object
             cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
