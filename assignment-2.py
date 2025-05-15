@@ -5,73 +5,51 @@ import numpy as np
 
 from transformers import pipeline
 from PIL import Image
+from utils import tracking, depth
+from ultralytics import YOLO
 
 def main():
+    
     parser = argparse.ArgumentParser(
-        description="Live depth estimation from camera input"
+        description="Track a specific object and estimate depth in its bounding box"
     )
-    parser.add_argument(
-        "-c", "--camera",
-        type=int,
-        default=0,
-        help="Camera index to use (default: 0)"
-    )
-    parser.add_argument(
-        "-m", "--model",
-        type=str,
-        default="depth-anything/Depth-Anything-V2-Small-hf",
-        help=(
-            "Hugging Face depth-estimation model ID (will be locally installed in the cache). Available models:\n"
-            "- depth-anything/Depth-Anything-V2-Small-hf    (Params: 24.8M)\n"
-            "- depth-anything/Depth-Anything-V2-Medium-hf   (Params: 97.5M)\n"
-            "- depth-anything/Depth-Anything-V2-Large-hf    (Params: 335.3M)\n"
-            "- depth-anything/Depth-Anything-V2-Giant-hf    (Params: 1.3B)"
-        )
-    )
+    parser.add_argument("-c","--camera", type=int, default=0, help="Camera index")
+
     args = parser.parse_args()
 
-    # Initialize depth-estimation pipeline
-    pipe = pipeline(task="depth-estimation", model=args.model)
+    # Init pipelines
+    depth_pipe  = pipeline(task="depth-estimation", model='depth-anything/Depth-Anything-V2-Small-hf')
+    detect_model = YOLO('./models/helmet-medium.pt')
 
-    # Open camera
     cap = cv2.VideoCapture(args.camera)
     if not cap.isOpened():
-        raise RuntimeError(f"Could not open camera {args.camera}")
+        raise RuntimeError(f"Could not open camera")
 
-    prev_time = time.time()
+    class_names = ["Person", "Helmet"]
     try:
         while True:
             ret, frame = cap.read()
             if not ret:
                 break
 
-            # BGR -> RGB -> PIL Image
-            rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            pil_img = Image.fromarray(rgb)
+            # 1) Run tracker on full frame
+            person = tracking.track_specific(detect_model, frame, 0, 1)
 
-            # Run depth estimation
-            depth = pipe(pil_img)["depth"]
-            depth_np = np.array(depth, dtype=np.float32)
+            if person is None:
+                cv2.imshow("Depth Tracking", frame)
+                continue
+        
+            track_id, cls_id, x1, y1, x2, y2 = person
+            
+            depth_person = depth.get_depth(depth_pipe, frame, (x1, y1, x2, y2), normalize=True)
+            # Draw a rectangle around the tracked object
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+            # draw depth
+            cv2.putText(frame, f"Depth: {depth_person:.2f}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
 
-            # Normalize & convert to 8-bit
-            depth_norm = cv2.normalize(
-                depth_np, None, 0, 255, cv2.NORM_MINMAX
-            ).astype(np.uint8)
+            cv2.imshow("Depth Tracking", frame)
+           
 
-            # Calculate FPS
-            curr_time = time.time()
-            fps = 1.0 / (curr_time - prev_time)
-            prev_time = curr_time
-
-            # Convert to BGR and overlay FPS in bottom-right
-            depth_bgr = cv2.cvtColor(depth_norm, cv2.COLOR_GRAY2BGR)
-            text = f"FPS: {fps:.1f}"
-            (text_w, text_h), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 1, 1)
-            pos = (depth_bgr.shape[1] - text_w - 10, depth_bgr.shape[0] - 10)
-            cv2.putText(depth_bgr, text, pos, cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,255), 1)
-            cv2.imshow("Depth", depth_bgr)
-
-            # Exit on 'q' key press
             if cv2.waitKey(1) & 0xFF == ord("q"):
                 break
     finally:
