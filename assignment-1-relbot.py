@@ -14,11 +14,11 @@ def assignment_1(frame, target_class=0, target_id=1):
         if track_id == target_id and cls_id == target_class:
             # Draw a rectangle around the tracked object
             cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-            cv2.putText(frame, f"Tracked: {class_names[cls_id]} id: {track_id}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+            cv2.putText(frame, f"TARGET | Class: {class_names[cls_id]} | Id: {track_id}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 1)
         else:
             # Draw a rectangle around the detected object
             cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
-            cv2.putText(frame, f"Other {class_names[cls_id]} id: {track_id}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
+            cv2.putText(frame, f"OTHER | Class: {class_names[cls_id]} | Id: {track_id}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255), 1)
 
     relative_x = (x1 + x2) / 2 / frame.shape[1]
     relative_y = (y1 + y2) / 2 / frame.shape[0]
