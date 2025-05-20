@@ -24,10 +24,10 @@ def assignment_1(frame, target_class=0, target_id=1):
     relative_y = (y1 + y2) / 2 / frame.shape[0]
 
     if relative_x < 0.5:
-        print("Object is on the left side of the frame, rotating....")
+        print("Object is on the left side of the frame -> Rotating to the left...")
         # TODO: Rotate robot to the left
     elif relative_x > 0.5:
-        print("Object is on the right side of the frame, rotating....")
+        print("Object is on the right side of the frame -> Rotating to the right...")
         # TODO: Rotate robot to the right
     
     cv2.imshow("Frame Tracking", frame)
