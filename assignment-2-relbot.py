@@ -4,6 +4,13 @@ from transformers import pipeline
 from utils import tracking, depth
 from ultralytics import YOLO
 
+import rclpy
+from rclpy.node import Node
+from geometry_msgs.msg import Point
+import gi
+import numpy as np
+import cv2
+
 detect_model    = YOLO('./models/helmet-medium.pt')
 depth_pipe      = pipeline(task="depth-estimation", model='depth-anything/Depth-Anything-V2-Small-hf')
 
@@ -43,9 +50,9 @@ def assignment_2(frame, target_class = 0, target_id = 1, depth_factor = 20000):
 if __name__ == "__main__":
     # run setup
 
-
+    run = True
     # run assignment 2 in loop()
-    while run = True: 
+    while run == True: 
         frame = 0
         target_class = 0
         target_id = 1
