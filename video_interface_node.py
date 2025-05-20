@@ -73,21 +73,30 @@ class VideoInterfaceNode(Node):
         person = tracking.track_specific(detect_model, frame, target_class, target_id)
 
         if person is None:
-            cv2.imshow("Depth Tracking", frame)
-            cv2.waitKey(1)
+            self.show_debug_window(frame, title="Depth Tracking")
             return None
 
         _, _, x1, y1, x2, y2 = person
         depth_person = depth.get_depth(depth_pipe, frame, (x1, y1, x2, y2), normalize=True)
         depth_person = depth_person * depth_factor
 
+        # Draw bounding box and label
         cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-        cv2.putText(frame, f"Depth: {depth_person:.2f}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
-        cv2.imshow("Depth Tracking", frame)
-        cv2.waitKey(1)
+        cv2.putText(frame, f"Depth: {depth_person:.2f}", (x1, y1 - 10),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+
+        self.show_debug_window(frame, title="Depth Tracking")
 
         horizontal_position = (x1 + x2) / 2
         return depth_person, horizontal_position
+
+    def show_debug_window(self, frame, title="Preview"):
+        # Resize frame for smaller preview (e.g., 320x240)
+        resized_frame = cv2.resize(frame, (320, 240))
+        cv2.imshow(title, resized_frame)
+        cv2.moveWindow(title, 100, 100)  # Position the window on screen
+        cv2.waitKey(1)
+
 
     def destroy_node(self):
         self.pipeline.set_state(Gst.State.NULL)
