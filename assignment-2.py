@@ -1,20 +1,22 @@
-import argparse
 import cv2
+import argparse
 
-from transformers import pipeline
-from utils import tracking, depth
 from ultralytics import YOLO
+from utils import tracking, depth
+from transformers import pipeline
 
+# !This script is created for testing purposes (on the PC) and is not part of the final solution!
 def main():
     parser = argparse.ArgumentParser(description="Track a specific object and estimate depth in its bounding box")
-    parser.add_argument("-c","--camera",            type = int,   default = 1,  help="Camera index")
-    parser.add_argument("-t_c","--target_class",    type = int,   default = 0,  help="Class to track (0 = Person & 1 = Helmet)")
-    parser.add_argument("-t_id","--target_id",      type = int,   default = 1,  help="Track ID to focus on")
+    parser.add_argument("-c","--camera",            type = int,     default = 0,        help = "Camera index")
+    parser.add_argument("-t_c","--target_class",    type = int,     default = 0,        help = "Class to track (0 = Person & 1 = Helmet)")
+    parser.add_argument("-t_id","--target_id",      type = int,     default = 1,        help = "Track ID to focus on")
+    parser.add_argument("-r_f","--resize_frame",    type = bool,    default = False,    help = "Resize the frame to 320x240 for simulation purposes")
     args = parser.parse_args()
 
-    # Init pipelines
-    detect_model = YOLO('./models/helmet-medium.pt')
-    depth_pipe  = pipeline(task="depth-estimation", model='depth-anything/Depth-Anything-V2-Small-hf')
+    # Init
+    detect_model    = YOLO('./models/helmet-medium.pt')
+    depth_pipe      = pipeline(task="depth-estimation", model='depth-anything/Depth-Anything-V2-Small-hf')
 
     # Initialize the camera
     cap = cv2.VideoCapture(args.camera)
@@ -26,6 +28,7 @@ def main():
             ret, frame = cap.read()
             # Check if frame is read correctly
             if not ret:
+                print("Error: Could not read frame.")
                 break
 
             # 1) Run tracker on full frame
@@ -42,11 +45,16 @@ def main():
 
             # 3) Draw the bounding box and depth on the frame
             cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-            cv2.putText(frame, f"Depth: {depth_person:.2f}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+            cv2.putText(frame, f"Depth: {depth_person:.2f}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 255, 0), 1)
             
-            cv2.imshow("Depth Tracking", frame)
+            # 5) Show the frame
+            if (args.resize_frame):
+                resized_frame = cv2.resize(frame, (320, 240))
+                cv2.imshow("Depth Tracking", resized_frame)
+            else:
+                cv2.imshow("Depth Tracking", frame)
 
-            # Exit on 'q' key
+            # Exit on 'q' key press
             if cv2.waitKey(1) & 0xFF == ord("q"):
                 break
     finally:

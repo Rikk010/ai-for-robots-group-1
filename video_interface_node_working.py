@@ -142,7 +142,6 @@ class VideoInterfaceNode(Node):
         tracked = False
         track_x1, track_x2 = 0, 0
         for track_id, cls_id, x1, y1, x2, y2, conf in tracks:
-            print(f"TrackID: {track_id}, TargetID: {target_id} | Class D: {cls_id}, TargetClass: {target_class}")
             if track_id == target_id and cls_id == target_class:
                 tracked = True
                 # Draw a rectangle around the tracked object
