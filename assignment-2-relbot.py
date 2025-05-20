@@ -35,3 +35,6 @@ def assignment_2(frame, target_class = 0, target_id = 1, depth_factor = 20000):
     cv2.putText(frame, f"Depth: {depth_person:.2f}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
 
     cv2.imshow("Depth Tracking", frame)
+
+    horizontal_position = (x1 + x2) / 2
+    return depth_person, horizontal_position
