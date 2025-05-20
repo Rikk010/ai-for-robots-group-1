@@ -103,6 +103,7 @@ class VideoInterfaceNode(Node):
         super().destroy_node()
 
 def main(args=None):
+    print('Starting...')
     rclpy.init(args=args)
     node = VideoInterfaceNode()
     try:
