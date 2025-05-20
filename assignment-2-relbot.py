@@ -38,3 +38,17 @@ def assignment_2(frame, target_class = 0, target_id = 1, depth_factor = 20000):
 
     horizontal_position = (x1 + x2) / 2
     return depth_person, horizontal_position
+
+
+if __name__ == "__main__":
+    # run setup
+
+
+    # run assignment 2 in loop()
+    while run = True: 
+        frame = 0
+        target_class = 0
+        target_id = 1
+        depth_factor = 20000
+
+        assignment_2(frame, target_class = target_class, target_id = target_id, depth_factor = depth_factor)
