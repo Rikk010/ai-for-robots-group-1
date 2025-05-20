@@ -62,13 +62,26 @@ class VideoInterfaceNode(Node):
         result = self.assignment_2(frame_bgr)
 
         if result:
-            print(f'pub: {result}')
+            print(f'Publish: {result}')
             depth_person, horizontal_position = result
             msg = Point()
             msg.x = horizontal_position
             msg.y = 0.0
             msg.z = depth_person
             self.position_pub.publish(msg)
+        else:
+            # optie 1
+            
+            self.position_pub.publish(None)
+            
+            # optie 2
+
+            # msg = Point()
+            # msg.x = 160
+            # msg.y = 0.0
+            # msg.z = 10001
+            # self.position_pub.publish(msg)
+
 
     def assignment_2(self, frame, target_class=0, target_id=1):
         tracks = tracking.track(detect_model, frame)
