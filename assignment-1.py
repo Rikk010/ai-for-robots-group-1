@@ -1,8 +1,7 @@
-from utils import tracking
-from utils import detection
-
-from ultralytics import YOLO
 import cv2
+
+from utils import tracking
+from ultralytics import YOLO
 
 CAMERA_ID       = 0     # 0 for the default camera | 1 for external
 TARGET_CLASS    = 0     # 0: Person | 1: Helmet
@@ -38,12 +37,13 @@ while True:
     relative_y = (y1 + y2) / 2 / frame.shape[0]
 
     if relative_x < 0.5:
-        print("Object is on the left side of the frame, rotating....")
-        # TODO: Rotate robot
+        print("Object is on the left side of the frame -> Rotating to the left...")
+        # TODO: Rotate robot to the left
     elif relative_x > 0.5:
-        print("Object is on the right side of the frame, rotating....")
+        print("Object is on the right side of the frame -> Rotating to the right...")
+        # TODO: Rotate robot to the right
 
-    cv2.imshow("Webcam Feed", frame)
+    cv2.imshow("Frame Tracking", frame)
     
     # Exit on 'q' key press
     if cv2.waitKey(1) & 0xFF == ord('q'):
