@@ -183,10 +183,10 @@ class VideoInterfaceNode(Node):
         right_side_depth = right_side_depth * DEPTH_FACTOR
         is_left_side_obstacle = False
         is_right_side_obstacle = False
-        if left_side_depth < OBSTACLE_THRESHOLD:
+        if left_side_depth > OBSTACLE_THRESHOLD:
             is_left_side_obstacle = True
             cv2.circle(frame, (int(frame.shape[1]/4), int(frame.shape[0]/2)), 5, (0, 0, 255), -1)
-        if right_side_depth < OBSTACLE_THRESHOLD:
+        if right_side_depth > OBSTACLE_THRESHOLD:
             is_right_side_obstacle = True
             cv2.circle(frame, (int(frame.shape[1]/4*3), int(frame.shape[0]/2)), 5, (0, 0, 255), -1)
         print("SIDE DEPTHS: ", left_side_depth, right_side_depth)
