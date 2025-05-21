@@ -6,6 +6,7 @@ import numpy as np
 import cv2
 
 from PIL import Image
+gi.require_version('Gst', '1.0')
 from gi.repository import Gst
 from rclpy.node import Node
 from geometry_msgs.msg import Point
@@ -15,23 +16,10 @@ from ultralytics import YOLO
 # ------------------------------------------------------
 # Constants
 # ------------------------------------------------------
-GST_PIPELINE_DEFAULT = (
-    'udpsrc port=5000 caps="application/x-rtp,media=video,'
-    'encoding-name=H264,payload=96" ! '
-    'rtph264depay ! avdec_h264 ! tee name=t '
-    't. ! queue ! videoconvert ! video/x-raw,format=RGB ! appsink name=sink '
-    't. ! queue ! x264enc ! mp4mux ! filesink location=output.mp4'
-)
 ASSIGNMENT_TO_RUN   = 1
 TARGET_CLASS        = 0       # 0 = Person | 1 = Helmet
 TARGET_ID           = 1
 DEPTH_FACTOR        = 20000
-
-# ------------------------------------------------------
-# Initialise GStreamer
-# ------------------------------------------------------
-gi.require_version('Gst', '1.0')
-Gst.init(None)
 
 # ------------------------------------------------------
 # Load models
@@ -108,9 +96,16 @@ class VideoInterfaceNode(Node):
         super().__init__('video_interface')
         self.position_pub = self.create_publisher(Point, '/object_position', 10)
 
-        self.declare_parameter('gst_pipeline', GST_PIPELINE_DEFAULT)
+        self.declare_parameter('gst_pipeline', (
+            'udpsrc port=5000 caps="application/x-rtp,media=video,'
+            'encoding-name=H264,payload=96" ! '
+            'rtph264depay ! avdec_h264 ! tee name=t '
+            't. ! queue ! videoconvert ! video/x-raw,format=RGB ! appsink name=sink '
+            't. ! queue ! x264enc ! mp4mux ! filesink location=output.mp4'
+        ))
         pipeline_str = self.get_parameter('gst_pipeline').value
 
+        Gst.init(None)
         self.pipeline = Gst.parse_launch(pipeline_str)
         self.sink     = self.pipeline.get_by_name('sink')
         self.sink.set_property('drop', True)
