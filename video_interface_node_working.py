@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 import rclpy
-from rclpy.node import Node
-from geometry_msgs.msg import Point
 import gi
 import numpy as np
 import cv2
-from PIL import Image
 
+from rclpy.node import Node
+from geometry_msgs.msg import Point
+from PIL import Image
 from transformers import pipeline
 from ultralytics import YOLO
 
@@ -144,16 +144,15 @@ class VideoInterfaceNode(Node):
         for track_id, cls_id, x1, y1, x2, y2, conf in tracks:
             if track_id == target_id and cls_id == target_class:
                 tracked = True
-                # Draw a rectangle around the tracked object
-                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                cv2.putText(frame, f"TARGET | Class: {class_names[cls_id]} | Id: {track_id}",
-                            (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.25, (0, 255, 0), 1)
                 track_x1, track_x2 = x1, x2
+
+                # Draw a rectangle around the target object 
+                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                cv2.putText(frame, f"TARGET | Class: {class_names[cls_id]} | Id: {track_id}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.25, (0, 255, 0), 1)
             else:
-                # Draw a rectangle around the detected object
+                # Draw a rectangle around the other object(s)
                 cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
-                cv2.putText(frame, f"OTHER | Class: {class_names[cls_id]} | Id: {track_id}",
-                            (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.25, (0, 0, 255), 1)
+                cv2.putText(frame, f"OTHER | Class: {class_names[cls_id]} | Id: {track_id}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.25, (0, 0, 255), 1)
 
         self.show_debug_window(frame, title="Frame Tracking")
 
