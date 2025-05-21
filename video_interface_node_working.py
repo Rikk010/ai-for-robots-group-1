@@ -1,82 +1,96 @@
 #!/usr/bin/env python3
-import rclpy
+
 import gi
+import rclpy
 import numpy as np
 import cv2
 
+from PIL import Image
+gi.require_version('Gst', '1.0')
+from gi.repository import Gst
 from rclpy.node import Node
 from geometry_msgs.msg import Point
-from PIL import Image
 from transformers import pipeline
 from ultralytics import YOLO
 
-gi.require_version('Gst', '1.0')
-from gi.repository import Gst
+# ------------------------------------------------------
+# Constants
+# ------------------------------------------------------
+ASSIGNMENT_TO_RUN   = 1
+TARGET_CLASS        = 0       # 0 = Person | 1 = Helmet
+TARGET_ID           = 1
+DEPTH_FACTOR        = 20000
 
-# Load models globally
-detect_model = YOLO('./models/helmet-medium.pt')
-depth_pipe = pipeline(task="depth-estimation", model='depth-anything/Depth-Anything-V2-Small-hf')
+# ------------------------------------------------------
+# Load models
+# ------------------------------------------------------
+DETECT_MODEL    = YOLO('./models/helmet-medium.pt')
+DEPTH_PIPELINE  = pipeline(task="depth-estimation", model='depth-anything/Depth-Anything-V2-Small-hf')
 
-def get_depth(pipe, frame, box, normalize=False):
+# ------------------------------------------------------
+# Helper functions
+# ------------------------------------------------------
+def get_depth(pipe, frame, box, normalise=False):
     """
-    Get depth of the object in the box
-    Higher means closer
-    Lower means further
-    Args:
-        pipe: depth estimation pipeline
-        frame: image frame
-        box: bounding box (x1, y1, x2, y2)
-        normalize: if True, normalize depth to [0, 1]
+    Calculate mean depth inside the given bounding box.
+    Higher values indicate nearer objects.
     """
     rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    depth_map = pipe(Image.fromarray(rgb))["depth"]
+    depth_arr = np.array(depth_map)
 
-    depth = pipe(Image.fromarray(rgb))["depth"]
+    if normalise:
+        depth_arr = (depth_arr - depth_arr.min()) / (depth_arr.max() - depth_arr.min())
 
-    # Get mean depth in box
-    x1, y1, x2, y2 = box
-    x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
-    depth = np.array(depth)
-    if normalize:
-        depth = (depth - np.min(depth)) / (np.max(depth) - np.min(depth))
+    x1, y1, x2, y2 = map(int, box)
+    crop = depth_arr[y1:y2, x1:x2]
+    return float(np.mean(crop))
 
-    # Crop depth to box
-    depth = depth[y1:y2, x1:x2]
-    depth = np.mean(depth)
-
-    return depth
 
 def track(model, frame):
-    res     = model.track(frame, persist=True, tracker="bytetrack.yaml")
-    boxes   = res[0].boxes.xyxy.cpu().numpy()
-    ids     = res[0].boxes.id.cpu().numpy() if hasattr(res[0].boxes, "id") and res[0].boxes.id is not None else [None] * len(boxes)
-    classes = res[0].boxes.cls.cpu().numpy() if hasattr(res[0].boxes, "cls") and res[0].boxes.cls is not None else [None] * len(boxes)
-    confs   = res[0].boxes.conf.cpu().numpy() if hasattr(res[0].boxes, "conf") and res[0].boxes.conf is not None else [None] * len(boxes)
+    """
+    Run object tracking and return list of entries:
+    (track_id, class_id, x1, y1, x2, y2, confidence).
+    """
+    results = model.track(frame, persist=True, tracker="bytetrack.yaml")
+    boxes = results[0].boxes
 
-    tracking_entries = []
-    for box, track_id, cls_id, conf in zip(boxes, ids, classes, confs):
-            if track_id is None or cls_id is None:
-                  continue
-            x1, y1, x2, y2 = map(int, box)
-            tracking_entries.append((
-                int(track_id),
-                int(cls_id),
-                x1, y1, x2, y2,
-                float(conf) if conf is not None else None
-            ))
-    return tracking_entries
+    xyxy = boxes.xyxy.cpu().numpy()
+    ids  = boxes.id.cpu().numpy()   if hasattr(boxes, "id")   and boxes.id   is not None else [None] * len(xyxy)
+    cls  = boxes.cls.cpu().numpy()  if hasattr(boxes, "cls")  and boxes.cls  is not None else [None] * len(xyxy)
+    conf = boxes.conf.cpu().numpy() if hasattr(boxes, "conf") and boxes.conf is not None else [None] * len(xyxy)
 
-def track_specific(model, frame, target_cls_id, target_track_id):
-    res     = model.track(frame, persist=True, tracker="bytetrack.yaml")
-    boxes   = res[0].boxes.xyxy.cpu().numpy()
-    ids     = res[0].boxes.id.cpu().numpy() if hasattr(res[0].boxes, "id") and res[0].boxes.id is not None else [None] * len(boxes)
-    classes = res[0].boxes.cls.cpu().numpy() if hasattr(res[0].boxes, "cls") and res[0].boxes.cls is not None else [None] * len(boxes)
+    entries = []
+    for (x1, y1, x2, y2), track_id, cls_id, c in zip(xyxy, ids, cls, conf):
+        if track_id is None or cls_id is None:
+            continue
+        entries.append((
+            int(track_id),
+            int(cls_id),
+            int(x1), int(y1), int(x2), int(y2),
+            float(c) if c is not None else None
+        ))
+    return entries
 
-    for box, track_id, cls_id in zip(boxes, ids, classes):
-            if cls_id != target_cls_id or track_id != target_track_id:
-                  x1, y1, x2, y2 = map(int, box)
-                  return track_id, cls_id, x1, y1, x2, y2
+def track_specific(model, frame, target_class, target_track_id):
+    """
+    Find and return the first other object that is NOT the target.
+    """
+    results = model.track(frame, persist=True, tracker="bytetrack.yaml")
+    boxes = results[0].boxes
+    xyxy = boxes.xyxy.cpu().numpy()
+    ids  = boxes.id.cpu().numpy()  if hasattr(boxes, "id")  and boxes.id  is not None else [None] * len(xyxy)
+    cls  = boxes.cls.cpu().numpy() if hasattr(boxes, "cls") and boxes.cls is not None else [None] * len(xyxy)
 
+    for (x1, y1, x2, y2), track_id, cls_id in zip(xyxy, ids, cls):
+        if cls_id != target_class or track_id != target_track_id:
+            return int(track_id), int(cls_id), int(x1), int(y1), int(x2), int(y2)
 
+    return None
+
+# ------------------------------------------------------
+# Main node
+# ------------------------------------------------------
 class VideoInterfaceNode(Node):
     def __init__(self):
         super().__init__('video_interface')
@@ -85,30 +99,32 @@ class VideoInterfaceNode(Node):
         self.declare_parameter('gst_pipeline', (
             'udpsrc port=5000 caps="application/x-rtp,media=video,'
             'encoding-name=H264,payload=96" ! '
-            'rtph264depay ! avdec_h264 ! videoconvert ! '
-            'video/x-raw,format=RGB ! appsink name=sink'
+            'rtph264depay ! avdec_h264 ! tee name=t '
+            't. ! queue ! videoconvert ! video/x-raw,format=RGB ! appsink name=sink '
+            't. ! queue ! x264enc ! mp4mux ! filesink location=output.mp4'
         ))
         pipeline_str = self.get_parameter('gst_pipeline').value
 
         Gst.init(None)
         self.pipeline = Gst.parse_launch(pipeline_str)
-        self.sink = self.pipeline.get_by_name('sink')
+        self.sink     = self.pipeline.get_by_name('sink')
         self.sink.set_property('drop', True)
         self.sink.set_property('max-buffers', 1)
         self.pipeline.set_state(Gst.State.PLAYING)
 
         self.timer = self.create_timer(1.0 / 30.0, self.on_timer)
-        self.get_logger().info('VideoInterfaceNode initialized, streaming at 30Hz')
+        self.get_logger().info('VideoInterfaceNode initialised, streaming at 30 Hz')
 
     def on_timer(self):
         sample = self.sink.emit('pull-sample')
         if not sample:
             return
 
-        buf = sample.get_buffer()
-        caps = sample.get_caps()
-        width = caps.get_structure(0).get_value('width')
+        buf    = sample.get_buffer()
+        caps   = sample.get_caps()
+        width  = caps.get_structure(0).get_value('width')
         height = caps.get_structure(0).get_value('height')
+
         ok, mapinfo = buf.map(Gst.MapFlags.READ)
         if not ok:
             return
@@ -116,27 +132,29 @@ class VideoInterfaceNode(Node):
         frame = np.frombuffer(mapinfo.data, np.uint8).reshape(height, width, 3)
         buf.unmap(mapinfo)
 
-        # Convert RGB to BGR for OpenCV/YOLO
-        frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+        frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)  # Convert RGB to BGR for OpenCV/YOLO
+        horizontal_position = 160.0                         # Fallback value
 
-        result = self.assignment_1(frame_bgr)
-
-        if result:
-            depth_person, horizontal_position = result
-            msg = Point()
-            msg.x = horizontal_position
-            msg.y = 0.0
-            msg.z = 10001.0
-            self.position_pub.publish(msg)
+        if ASSIGNMENT_TO_RUN == 1:
+            result = self.assignment_1(frame_bgr)   # Returns the horizontal position
+            if result is not None:
+                horizontal_position = frame_bgr
+        elif ASSIGNMENT_TO_RUN == 2:
+            result = self.assignment_2(frame_bgr)   # Returns the depth and horizontal position
+            if result is not None:
+                depth_person, horizontal_position = result
+        elif ASSIGNMENT_TO_RUN == 3:
+            self.get_logger().info("Assignment 3 is not implemented yet.")
+            return
         else:
-            msg = Point()
-            msg.x = 160.0
-            msg.y = 0.0
-            msg.z = 10001.0
-            self.position_pub.publish(msg)
+            self.get_logger().error(f"Invalid assignment number: {ASSIGNMENT_TO_RUN}. Please set it to 1, 2 or 3.")
+            return
 
-    def assignment_1(self, frame, target_class=0, target_id=1):
-        tracks = track(detect_model, frame)
+        msg = Point(x=horizontal_position, y=0.0, z=10001.0)
+        self.position_pub.publish(msg)
+
+    def assignment_1(self, frame, target_class = TARGET_CLASS, target_id = TARGET_ID):
+        tracks = track(DETECT_MODEL, frame)
 
         class_names = ["Person", "Helmet"]
         tracked = False
@@ -154,42 +172,39 @@ class VideoInterfaceNode(Node):
                 cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
                 cv2.putText(frame, f"OTHER | Class: {class_names[cls_id]} | Id: {track_id}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.25, (0, 0, 255), 1)
 
-        self.show_debug_window(frame, title="Frame Tracking")
+        self.show_debug_window(frame, title = "Frame Tracking")
 
         if not tracked:
             return None
 
         horizontal_position = (track_x1 + track_x2) / 2
-        return 0.0, horizontal_position  # depth value is mocked as 0.0 for compatibility
+        return horizontal_position
 
-    def assignment_2(self, frame, target_class=0, target_id=1, depth_factor=20000):
-        person = track_specific(detect_model, frame, target_class, target_id)
+    def assignment_2(self, frame, target_class = 0, target_id = 1, depth_factor = 20000):
+            person = track_specific(DETECT_MODEL, frame, target_class, target_id)
 
-        if person is None:
-            self.show_debug_window(frame, title="Depth Tracking")
-            return None
+            if person is None:
+                self.show_debug_window(frame, title="Depth Tracking")
+                return None
 
-        _, _, x1, y1, x2, y2 = person
-        depth_person = get_depth(depth_pipe, frame, (x1, y1, x2, y2), normalize=True)
-        depth_person = depth_person * depth_factor
+            _, _, x1, y1, x2, y2 = person
+            depth_person = get_depth(DEPTH_PIPELINE, frame, (x1, y1, x2, y2), normalize=True)
+            depth_person = depth_person * depth_factor
 
-        # Draw bounding box and label
-        cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-        cv2.putText(frame, f"Depth: {depth_person:.2f}", (x1, y1 - 10),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+            # Draw bounding box and label
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+            cv2.putText(frame, f"Depth: {depth_person:.2f}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
 
-        self.show_debug_window(frame, title="Depth Tracking")
+            self.show_debug_window(frame, title = "Depth Tracking")
 
-        horizontal_position = (x1 + x2) / 2
-        return depth_person, horizontal_position
+            horizontal_position = (x1 + x2) / 2
+            return depth_person, horizontal_position
 
-    def show_debug_window(self, frame, title="Preview"):
-        # Resize frame for smaller preview (e.g., 320x240)
+    def show_debug_window(self, frame, title):
         resized_frame = cv2.resize(frame, (320, 240))
         cv2.imshow(title, resized_frame)
-        cv2.moveWindow(title, 100, 100)  # Position the window on screen
+        cv2.moveWindow(title, 100, 100)
         cv2.waitKey(1)
-
 
     def destroy_node(self):
         self.pipeline.set_state(Gst.State.NULL)
