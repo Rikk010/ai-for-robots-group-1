@@ -14,10 +14,9 @@ from utils import tracking, depth  # Ensure these are correctly imported
 gi.require_version('Gst', '1.0')
 from gi.repository import Gst
 
-# Load models globally
-detect_model = YOLO('./models/helmet-medium.pt')
-depth_pipe = pipeline(task="depth-estimation", model='depth-anything/Depth-Anything-V2-Small-hf')
 
+detect_model    = YOLO('./models/helmet-medium.pt')
+depth_pipe      = pipeline(task="depth-estimation", model='depth-anything/Depth-Anything-V2-Small-hf')
 
 def track_specific(model, frame, target_cls_id, target_track_id):
     res = model.track(frame, persist=True, tracker="bytetrack.yaml")
@@ -89,7 +88,51 @@ def get_target_position(frame, target_class = 0, target_id = 1, depth_factor = 2
     return depth_person, horizontal_position, vertical_position
 
 
+if __name__ == "__main__":
+    # run setup
 
+    run = True
+    # run assignment 2 in loop()
+    cap = cv2.VideoCapture(1)
+    while run == True: 
+        ret, frame = cap.read()
+        frame = cv2.resize(frame, (320, 240))
+        DEPTH_FACTOR = 20000
+        OBSTACLE_THRESHOLD = 5000
+
+        left_side_depth = get_depth(depth_pipe, frame, (0, 0, int(frame.shape[1]/4), frame.shape[0]), normalize=True)
+        right_side_depth = get_depth(depth_pipe, frame, (int(frame.shape[1]/4*3), 0, frame.shape[1], frame.shape[0]), normalize=True)
+        left_side_depth = left_side_depth * DEPTH_FACTOR
+        right_side_depth = right_side_depth * DEPTH_FACTOR
+        if left_side_depth < OBSTACLE_THRESHOLD:
+             cv2.circle(frame, (int(frame.shape[1]/4), int(frame.shape[0]/2)), 5, (0, 0, 255), -1)
+        if right_side_depth < OBSTACLE_THRESHOLD:
+            cv2.circle(frame, (int(frame.shape[1]/4*3), int(frame.shape[0]/2)), 5, (0, 0, 255), -1)
+        print("SIDE DEPTHS: ", left_side_depth, right_side_depth)
+
+        # PUT this in relbot code
+        target = get_target_position(frame, target_class = 0, target_id = 1, depth_factor = DEPTH_FACTOR)
+        if target is None:
+            # No target found, don't change anything.
+            cv2.imshow("Depth Tracking", frame)
+            
+            continue
+        person_z, person_x, person_y = target
+
+        
+        # Debug drawing
+        cv2.circle(frame, (int(person_x), int(person_y)), 5, (0, 255, 0), -1)
+        print(f"Depth: {person_z:.2f}, Horizontal Position: {person_x:.2f}")
+
+        # End of relbot
+
+
+        # show frame
+        cv2.imshow("Depth Tracking", frame)
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+
+     
 
 class VideoInterfaceNode(Node):
     def __init__(self):
@@ -130,27 +173,52 @@ class VideoInterfaceNode(Node):
         frame = np.frombuffer(mapinfo.data, np.uint8).reshape(height, width, 3)
         buf.unmap(mapinfo)
 
-        # Start assignment 2
-        target = get_target_position(frame, target_class = 0, target_id = 1, depth_factor = 20000)
-        if target is None:
-            msg = Point()
-            msg.x = 160.0
-            msg.y = 0.0
-            msg.z = 10001.0
-            self.position_pub.publish(msg)
-            print("No target found")
-            return
+        # Start assignment 2b
+        DEPTH_FACTOR = 20000
+        OBSTACLE_THRESHOLD = 5000
 
+        left_side_depth = get_depth(depth_pipe, frame, (0, 0, int(frame.shape[1]/4), frame.shape[0]), normalize=True)
+        right_side_depth = get_depth(depth_pipe, frame, (int(frame.shape[1]/4*3), 0, frame.shape[1], frame.shape[0]), normalize=True)
+        left_side_depth = left_side_depth * DEPTH_FACTOR
+        right_side_depth = right_side_depth * DEPTH_FACTOR
+        is_left_side_obstacle = False
+        is_right_side_obstacle = False
+        if left_side_depth < OBSTACLE_THRESHOLD:
+            is_left_side_obstacle = True
+            cv2.circle(frame, (int(frame.shape[1]/4), int(frame.shape[0]/2)), 5, (0, 0, 255), -1)
+        if right_side_depth < OBSTACLE_THRESHOLD:
+            is_right_side_obstacle = True
+            cv2.circle(frame, (int(frame.shape[1]/4*3), int(frame.shape[0]/2)), 5, (0, 0, 255), -1)
+        print("SIDE DEPTHS: ", left_side_depth, right_side_depth)
+
+        # PUT this in relbot code
+        target = get_target_position(frame, target_class = 0, target_id = 1, depth_factor = DEPTH_FACTOR)
+        if target is None:
+            # No target found, don't change anything.
+            return
         person_z, person_x, person_y = target
+
+        target_x, target_y, target_z = person_x, person_y, person_z
+
+        # If there is an obstacle on the left side, set the target pos to the opposite side
+        if is_left_side_obstacle:
+            target_x = 320
+        if is_right_side_obstacle:
+            target_x = 0
+
+    
+        # Debug drawing
+        cv2.circle(frame, (int(person_x), int(person_y)), 5, (0, 255, 0), -1)
         print(f"Depth: {person_z:.2f}, Horizontal Position: {person_x:.2f}")
 
+
         msg = Point()
-        msg.x = person_x
-        msg.y = person_y
-        msg.z = person_z
+        msg.x = target_x
+        msg.y = target_y
+        msg.z = target_z
         self.position_pub.publish(msg)
 
-        # End assignment 2
+        # End assignment 2b
    
 
     def show_debug_window(self, frame, title="Preview"):

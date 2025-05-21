@@ -89,13 +89,41 @@ if __name__ == "__main__":
     while run == True: 
         ret, frame = cap.read()
         frame = cv2.resize(frame, (320, 240))
+        DEPTH_FACTOR = 20000
+        OBSTACLE_THRESHOLD = 5000
+
+        left_side_depth = get_depth(depth_pipe, frame, (0, 0, int(frame.shape[1]/4), frame.shape[0]), normalize=True)
+        right_side_depth = get_depth(depth_pipe, frame, (int(frame.shape[1]/4*3), 0, frame.shape[1], frame.shape[0]), normalize=True)
+        left_side_depth = left_side_depth * DEPTH_FACTOR
+        right_side_depth = right_side_depth * DEPTH_FACTOR
+        is_left_side_obstacle = False
+        is_right_side_obstacle = False
+        if left_side_depth < OBSTACLE_THRESHOLD:
+            is_left_side_obstacle = True
+            cv2.circle(frame, (int(frame.shape[1]/4), int(frame.shape[0]/2)), 5, (0, 0, 255), -1)
+        if right_side_depth < OBSTACLE_THRESHOLD:
+            is_right_side_obstacle = True
+            cv2.circle(frame, (int(frame.shape[1]/4*3), int(frame.shape[0]/2)), 5, (0, 0, 255), -1)
+        print("SIDE DEPTHS: ", left_side_depth, right_side_depth)
 
         # PUT this in relbot code
-        target = get_target_position(frame, target_class = 0, target_id = 1, depth_factor = 20000)
+        target = get_target_position(frame, target_class = 0, target_id = 1, depth_factor = DEPTH_FACTOR)
         if target is None:
+            # No target found, don't change anything.
+            cv2.imshow("Depth Tracking", frame)
+            
             continue
         person_z, person_x, person_y = target
 
+        target_x, target_y, target_z = person_x, person_y, person_z
+
+        # If there is an obstacle on the left side, set the target pos to the opposite side
+        if is_left_side_obstacle:
+            target_x = 320
+        if is_right_side_obstacle:
+            target_x = 0
+
+    
         # Debug drawing
         cv2.circle(frame, (int(person_x), int(person_y)), 5, (0, 255, 0), -1)
         print(f"Depth: {person_z:.2f}, Horizontal Position: {person_x:.2f}")
