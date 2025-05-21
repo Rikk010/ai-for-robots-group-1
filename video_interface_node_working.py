@@ -85,8 +85,9 @@ class VideoInterfaceNode(Node):
         self.declare_parameter('gst_pipeline', (
             'udpsrc port=5000 caps="application/x-rtp,media=video,'
             'encoding-name=H264,payload=96" ! '
-            'rtph264depay ! avdec_h264 ! videoconvert ! '
-            'video/x-raw,format=RGB ! appsink name=sink'
+            'rtph264depay ! avdec_h264 ! tee name=t '
+            't. ! queue ! videoconvert ! video/x-raw,format=RGB ! appsink name=sink '
+            't. ! queue ! x264enc ! mp4mux ! filesink location=output.mp4'
         ))
         pipeline_str = self.get_parameter('gst_pipeline').value
 
