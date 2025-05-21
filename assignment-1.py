@@ -10,7 +10,7 @@ def main():
     parser.add_argument("-c","--camera",            type = int,     default = 0,        help = "Camera index")
     parser.add_argument("-t_c","--target_class",    type = int,     default = 0,        help = "Class to track (0 = Person & 1 = Helmet)")
     parser.add_argument("-t_id","--target_id",      type = int,     default = 1,        help = "Track ID to focus on")
-    parser.add_argument("-r_f","--resize_frame",    type = bool,    default = False,    help = "Resize the frame to 320x240 for simulation purposes")
+    parser.add_argument("-r_f","--resize_frame",    type = bool,    default = True,     help = "Resize the frame to 320x240 for simulation purposes")
     args = parser.parse_args()
 
     # Init
@@ -29,6 +29,10 @@ def main():
             if not ret:
                 print("Error: Could not read frame.")
                 break
+
+            # Resize the frame for simulation purposes
+            if (args.resize_frame):
+                frame = cv2.resize(frame, (320, 240))
 
             # 1) Run tracker on full frame
             tracks = tracking.track(detect_model, frame)
@@ -54,17 +58,11 @@ def main():
             # 4) Print the relative position state
             if relative_x < 0.5:
                 print("Object is on the left side of the frame -> Rotating to the left...")
-                # TODO: Rotate robot to the left
             elif relative_x > 0.5:
                 print("Object is on the right side of the frame -> Rotating to the right...")
-                # TODO: Rotate robot to the right
 
             # 5) Show the frame
-            if (args.resize_frame):
-                resized_frame = cv2.resize(frame, (320, 240))
-                cv2.imshow("Frame Tracking", resized_frame)
-            else:
-                cv2.imshow("Frame Tracking", frame)
+            cv2.imshow("Frame Tracking", frame)
             
             # Exit on 'q' key press
             if cv2.waitKey(1) & 0xFF == ord('q'):
