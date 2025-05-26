@@ -191,7 +191,7 @@ class VideoInterfaceNode(Node):
 
         # Draw the debug circle on the tracked person
         cv2.circle(frame, (int(person_x), int(person_y)), 5, (0, 255, 0), -1)
-        print(f"Person depth: {person_z:.2f}, Person horizontal position: {person_x:.2f}")
+        print(f"Person depth: {person_z:.2f} | Person horizontal position: {person_x:.2f}")
 
         msg = Point()
         msg.x = target_x

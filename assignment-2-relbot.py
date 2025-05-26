@@ -152,7 +152,7 @@ class VideoInterfaceNode(Node):
         # Start Assignment 2(A)
         target = get_target_position(frame, target_class = 0, target_id = 1, depth_factor = 20000)
         if target is None:
-            msg  = Point()
+            msg   = Point()
             msg.x = 160.0
             msg.y = 0.0
             msg.z = 10001.0
@@ -161,7 +161,7 @@ class VideoInterfaceNode(Node):
             return
 
         person_z, person_x, person_y = target
-        print(f"Person depth: {person_z:.2f}, Person horizontal position: {person_x:.2f}")
+        print(f"Person depth: {person_z:.2f} | Person horizontal position: {person_x:.2f}")
 
         msg = Point()
         msg.x = person_x
