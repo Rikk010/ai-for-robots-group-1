@@ -105,61 +105,9 @@ def get_target_position(frame, target_class = 0, target_id = 1, depth_factor = 2
     depth_person = depth_person * depth_factor
     
     horizontal_position = (x1 + x2) / 2
-    vertical_position = (y1 + y2) / 2
+    vertical_position   = (y1 + y2) / 2
 
     return depth_person, horizontal_position, vertical_position
-
-
-if __name__ == "__main__":
-    # Run setup
-    run = True
-
-    # Run assignment 2 in loop()
-    cap = cv2.VideoCapture(1)
-    while run == True: 
-        ret, frame = cap.read()
-        frame = cv2.resize(frame, (320, 240))
-
-        DEPTH_FACTOR       = 20000
-        OBSTACLE_THRESHOLD = 5000
-
-        # Get the depth of the left and right side of the frame & Scale them
-        left_side_depth  = get_depth(depth_pipe, frame, (0, 0, int(frame.shape[1]/4), frame.shape[0]), normalize=True)
-        right_side_depth = get_depth(depth_pipe, frame, (int(frame.shape[1]/4*3), 0, frame.shape[1], frame.shape[0]), normalize=True)
-
-        # Check if there are obstacles on the left or right side
-        left_side_depth  = left_side_depth * DEPTH_FACTOR
-        right_side_depth = right_side_depth * DEPTH_FACTOR
-
-        if left_side_depth > OBSTACLE_THRESHOLD:
-            is_left_side_obstacle = True
-            cv2.circle(frame, (int(frame.shape[1]/4*3), int(frame.shape[0]/2)), 5, (0, 0, 255), -1)
-        if right_side_depth > OBSTACLE_THRESHOLD:
-            is_right_side_obstacle = True
-            cv2.circle(frame, (int(frame.shape[1]/4), int(frame.shape[0]/2)), 5, (0, 0, 255), -1)
-
-        print(f"SIDE DEPTHS | Left: {left_side_depth} & Right: {right_side_depth}")
-
-        # Put this in relbot code
-        target = get_target_position(frame, target_class = 0, target_id = 1, depth_factor = DEPTH_FACTOR)
-        if target is None:
-            # No target found, don't change anything.
-            cv2.imshow("Depth Tracking", frame)
-            continue
-
-        # If target is found, assign the values
-        person_z, person_x, person_y = target
-
-        # Draw the debug circle on the tracked person
-        cv2.circle(frame, (int(person_x), int(person_y)), 5, (0, 255, 0), -1)
-        print(f"Person depth: {person_z:.2f}, Person horizontal position: {person_x:.2f}")
-
-        # End of relbot
-
-        # Show frame
-        cv2.imshow("Depth Tracking", frame)
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
 
 class VideoInterfaceNode(Node):
     def __init__(self):
