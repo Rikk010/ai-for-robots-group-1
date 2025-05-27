@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from tkinter import Image
+from PIL import Image
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Point
@@ -147,41 +147,99 @@ class VideoInterfaceNode(Node):
 
         frame = np.frombuffer(mapinfo.data, np.uint8).reshape(height, width, 3)
         buf.unmap(mapinfo)
-
+        #frame.setflags(write=1)
+        frame = np.array(frame, copy=True)
         # --- Video recording setup ---
         if not hasattr(self, 'video_writer'):
             fourcc = cv2.VideoWriter_fourcc(*'mp4v')
             self.video_writer = cv2.VideoWriter('output.mp4', fourcc, 30.0, (width, height))
+        # Save a copy of the original frame for recording (no annotations)
+        frame_for_record = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+        #frame_for_record = frame.copy()
         # ----------------------------
 
+        # --- Draw boxes for all detected persons ---
+        res = detect_model.track(frame, persist=True, tracker="bytetrack.yaml")
+        boxes_data = res[0].boxes
+        if boxes_data is not None and boxes_data.id is not None and boxes_data.cls is not None:
+            boxes   = boxes_data.xyxy.cpu().numpy()
+            ids     = boxes_data.id.cpu().numpy()
+            classes = boxes_data.cls.cpu().numpy()
+            for box, track_id, cls_id in zip(boxes, ids, classes):
+                if cls_id == 0:  # Only draw for persons
+                    x1, y1, x2, y2 = map(int, box)
+                    if track_id == 1:
+                        color = (0, 255, 0)  # Green for tracked person (ID 1)
+                        thickness = 3
+                    else:
+                        color = (0, 0, 255)  # Red for others
+                        thickness = 2
+                    cv2.rectangle(frame, (x1, y1), (x2, y2), color, thickness)
+        # --- End box drawing ---
+
         # -------------------------
-        # Start Assignment 2(A)
-        target = get_target_position(frame, target_class = 0, target_id = 1, depth_factor = 20000)
+        # Start Assignment 2B
+        DEPTH_FACTOR       = 20000
+        OBSTACLE_THRESHOLD = 10000
+
+        # Get the depth of the left and right side of the frame & Scale them
+        left_side_depth  = get_depth(depth_pipe, frame, (0, 0, int(frame.shape[1]/4), frame.shape[0]), normalize=True)
+        right_side_depth = get_depth(depth_pipe, frame, (int(frame.shape[1]/4*3), 0, frame.shape[1], frame.shape[0]), normalize=True)
+
+        left_side_depth  = left_side_depth * DEPTH_FACTOR
+        right_side_depth = right_side_depth * DEPTH_FACTOR
+
+        # Check if there are obstacles on the left or right side
+        is_left_side_obstacle  = False
+        is_right_side_obstacle = False
+
+        if left_side_depth > OBSTACLE_THRESHOLD:
+            is_left_side_obstacle = True
+            cv2.circle(frame, (int(frame.shape[1]/4), int(frame.shape[0]/2)), 5, (0, 0, 255), -1)
+        if right_side_depth > OBSTACLE_THRESHOLD:
+            is_right_side_obstacle = True
+            cv2.circle(frame, (int(frame.shape[1]/4*3), int(frame.shape[0]/2)), 5, (0, 0, 255), -1)
+
+        print(f"SIDE DEPTHS | Left: {left_side_depth} & Right: {right_side_depth}")
+
+        target = get_target_position(frame, target_class = 0, target_id = 1, depth_factor = DEPTH_FACTOR)
         if target is None:
             msg   = Point()
             msg.x = 160.0
             msg.y = 0.0
             msg.z = 10001.0
             self.position_pub.publish(msg)
+            self.show_debug_window(frame)
             print("No target found")
-            # Still record the frame even if no target
-            self.video_writer.write(frame)
             return
-
+        
+        # If target is found, assign the values
         person_z, person_x, person_y = target
+        target_x, target_y, target_z = person_x, person_y, person_z
+
+        # If there is an obstacle on the left side, set the target pos to the opposite side
+        if is_left_side_obstacle:
+            target_x = 240.0
+        if is_right_side_obstacle:
+            target_x = 80.0
+
+        # Draw the debug circle on the tracked person
+        cv2.circle(frame, (int(person_x), int(person_y)), 5, (0, 255, 0), -1)
         print(f"Person depth: {person_z:.2f} | Person horizontal position: {person_x:.2f}")
 
         msg = Point()
-        msg.x = person_x
-        msg.y = person_y
-        msg.z = person_z
+        msg.x = target_x
+        msg.y = target_y
+        msg.z = target_z
         self.position_pub.publish(msg)
 
-        # Record the frame
-        self.video_writer.write(frame)
-        # End Assignment 2(A)
-        # -------------------------
+        # Write the unannotated frame to the video file
+        self.video_writer.write(frame_for_record)
+        self.show_debug_window(frame)
 
+        # End Assignment 2B
+        # -------------------------
+   
     def show_debug_window(self, frame, title="Preview"):
         resized_frame = cv2.resize(frame, (320, 240))
         cv2.imshow(title, resized_frame)
@@ -203,6 +261,10 @@ def main(args=None):
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
+        # --- Release video writer if present on interrupt ---
+        if hasattr(node, 'video_writer'):
+            node.video_writer.release()
+        # --------------------------------------
         pass
     finally:
         node.destroy_node()
