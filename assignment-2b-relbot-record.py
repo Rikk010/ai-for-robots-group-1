@@ -148,6 +148,33 @@ class VideoInterfaceNode(Node):
         frame = np.frombuffer(mapinfo.data, np.uint8).reshape(height, width, 3)
         buf.unmap(mapinfo)
 
+        # --- Video recording setup ---
+        if not hasattr(self, 'video_writer'):
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            self.video_writer = cv2.VideoWriter('output.mp4', fourcc, 30.0, (width, height))
+        # Save a copy of the original frame for recording (no annotations)
+        frame_for_record = frame.copy()
+        # ----------------------------
+
+        # --- Draw boxes for all detected persons ---
+        res = detect_model.track(frame, persist=True, tracker="bytetrack.yaml")
+        boxes_data = res[0].boxes
+        if boxes_data is not None and boxes_data.id is not None and boxes_data.cls is not None:
+            boxes   = boxes_data.xyxy.cpu().numpy()
+            ids     = boxes_data.id.cpu().numpy()
+            classes = boxes_data.cls.cpu().numpy()
+            for box, track_id, cls_id in zip(boxes, ids, classes):
+                if cls_id == 0:  # Only draw for persons
+                    x1, y1, x2, y2 = map(int, box)
+                    if track_id == 1:
+                        color = (0, 255, 0)  # Green for tracked person (ID 1)
+                        thickness = 3
+                    else:
+                        color = (0, 0, 255)  # Red for others
+                        thickness = 2
+                    cv2.rectangle(frame, (x1, y1), (x2, y2), color, thickness)
+        # --- End box drawing ---
+
         # -------------------------
         # Start Assignment 2B
         DEPTH_FACTOR       = 20000
@@ -203,6 +230,8 @@ class VideoInterfaceNode(Node):
         msg.z = target_z
         self.position_pub.publish(msg)
 
+        # Write the unannotated frame to the video file
+        self.video_writer.write(frame_for_record)
         # End Assignment 2B
         # -------------------------
    
@@ -213,6 +242,10 @@ class VideoInterfaceNode(Node):
         cv2.waitKey(1)
 
     def destroy_node(self):
+        # --- Release video writer if present ---
+        if hasattr(self, 'video_writer'):
+            self.video_writer.release()
+        # --------------------------------------
         self.pipeline.set_state(Gst.State.NULL)
         super().destroy_node()
 
@@ -223,6 +256,10 @@ def main(args=None):
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
+        # --- Release video writer if present on interrupt ---
+        if hasattr(node, 'video_writer'):
+            node.video_writer.release()
+        # --------------------------------------
         pass
     finally:
         node.destroy_node()
