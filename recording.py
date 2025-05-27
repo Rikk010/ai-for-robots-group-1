@@ -1,7 +1,7 @@
 import cv2
 
 def record_resized_video(output_path='output.avi',
-                         cam_index=0,
+                         cam_index=2,
                          frame_size=(320, 240),
                          fps=30.0,
                          codec='XVID'):
@@ -41,7 +41,7 @@ def record_resized_video(output_path='output.avi',
 if __name__ == '__main__':
     record_resized_video(
         output_path='camera_320x240.avi',
-        cam_index=0,
+        cam_index=2,
         frame_size=(320, 240),
         fps=30.0,
         codec='XVID'
