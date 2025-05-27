@@ -3,7 +3,7 @@ import cv2
 def record_resized_video(output_path='output.avi',
                          cam_index=0,
                          frame_size=(320, 240),
-                         fps=20.0,
+                         fps=30.0,
                          codec='XVID'):
     # Open the camera
     cap = cv2.VideoCapture(cam_index)
@@ -43,6 +43,6 @@ if __name__ == '__main__':
         output_path='camera_320x240.avi',
         cam_index=0,
         frame_size=(320, 240),
-        fps=20.0,
+        fps=30.0,
         codec='XVID'
     )
