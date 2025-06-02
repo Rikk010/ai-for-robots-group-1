@@ -59,7 +59,7 @@ class VideoInterfaceNode(Node):
         # Convert RGB to BGR for OpenCV/YOLO
         frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
 
-        result = self.assignment_2(frame_bgr)
+        result = self.assignment_1(frame_bgr)
 
         if result:
             print(f'Publish: {result}')
@@ -77,7 +77,7 @@ class VideoInterfaceNode(Node):
             self.position_pub.publish(msg)
 
 
-    def assignment_2(self, frame, target_class=0, target_id=1):
+    def assignment_1(self, frame, target_class=0, target_id=1):
         tracks = tracking.track(detect_model, frame)
 
         class_names = ["Person", "Helmet"]
